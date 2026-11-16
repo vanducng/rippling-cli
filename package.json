@@ -9,6 +9,27 @@
   "files": [
     "dist"
   ],
+  "keywords": [
+    "rippling",
+    "rpass",
+    "cli",
+    "password-manager",
+    "totp"
+  ],
+  "author": "Duc Nguyen",
+  "license": "MIT",
+  "homepage": "https://github.com/vanducng/rippling-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanducng/rippling-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vanducng/rippling-cli/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=20"
   },
@@ -16,7 +37,8 @@
     "build": "tsup",
     "dev": "tsx src/bin.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx src/*.test.ts"
+    "test": "node --test --import tsx src/*.test.ts",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "classic-level": "^1.4.1",

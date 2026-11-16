@@ -1,5 +1,8 @@
 # rippling-cli (`rpl`)
 
+[![ci](https://github.com/vanducng/rippling-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/vanducng/rippling-cli/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/rippling-cli.svg)](https://www.npmjs.com/package/rippling-cli)
+
 A terminal client for Rippling, starting with **RPass** - pull your password-manager
 credentials without opening the browser extension.
 
@@ -9,9 +12,13 @@ credentials without opening the browser extension.
 ## Install
 
 ```bash
-npm install
-npm run build
-npm link        # exposes `rpl`
+npm install -g rippling-cli   # exposes `rpl`
+```
+
+From source:
+
+```bash
+npm install && npm run build && npm link
 ```
 
 ## Quick start
@@ -53,8 +60,7 @@ stderr with a stable `code`, `retryable`, and `next_steps`, and exit non-zero.
 ## Scope
 
 v1 is read-only: `auth`, `unlock`, `list`, `get`, `totp`. No writes, sharing, or
-partner/spoof roles. See [GOAL.md](./GOAL.md) for the design and the
-reverse-engineered RPass crypto model.
+partner/spoof roles.
 
 ## Develop
 
@@ -63,6 +69,13 @@ npm run dev -- rpass list   # tsx, no build
 npm test                    # crypto self-checks
 npm run typecheck
 ```
+
+## Releasing
+
+`release-please` opens a release PR from Conventional Commits; merging it tags the
+version and the `release` workflow publishes to npm with provenance via OIDC
+trusted publishing (no `NPM_TOKEN`). One-time: publish `0.1.0` once, then add this
+repo as the package's Trusted Publisher on npmjs.
 
 ## License
 

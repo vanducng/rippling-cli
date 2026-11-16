@@ -1,3 +1,6 @@
 node_modules
 dist
 *.tgz
+
+# local design notes, not published
+GOAL.md
