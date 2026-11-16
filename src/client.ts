@@ -55,6 +55,17 @@ export class RipplingClient {
 
   // --- master key -----------------------------------------------------------
 
+  /** The master password is the Rippling login password; check it the way the extension does. */
+  async verifyPassword(password: string): Promise<boolean> {
+    if (!this.session.email) throw new CliError("NO_EMAIL", "Session has no email. Re-run `rpl rpass auth import-extension`.");
+    const hashed = `${(await pbkdf2Hex(password, "1", MK_ITERATIONS, false)).toUpperCase()}:$separator$:v2`;
+    const resp = await this.req<{ valid?: boolean }>("POST", "/auth_ext/verify_password", {
+      email: this.session.email,
+      password: hashed,
+    });
+    return resp.valid === true;
+  }
+
   /** Derive the role's master key from the master password (v2 server-salt flow). */
   async deriveMasterKey(password: string): Promise<string> {
     const salt = await this.req<string>("GET", "/rpass/api/role_settings/get_masterkey_salt");
@@ -62,7 +73,8 @@ export class RipplingClient {
     const resp = await this.req<{ password_hash?: string }>(
       "POST",
       "/rpass/api/role_settings/hash_with_server_token",
-      { password_hash: k1, version: 2 },
+      // The server hashes the string as-is; the extension enrolled it as uppercase hex.
+      { password_hash: k1.toUpperCase(), version: 2 },
     );
     if (!resp.password_hash) {
       throw new CliError("MK_SERVER_TOKEN", "hash_with_server_token returned no password_hash.");
@@ -77,12 +89,24 @@ export class RipplingClient {
 
   // --- keys -----------------------------------------------------------------
 
-  private async userPrivateKey(masterKey: string): Promise<{ privateKey: string }> {
+  async userPrivateKey(masterKey: string): Promise<{ privateKey: string }> {
     const keys = await this.req<any[]>("GET", `/rpass/api/user_keys/?role=${this.session.roleId}`);
     const uk = keys.find((k) => k.role === this.session.roleId) ?? keys[0];
     if (!uk) throw new CliError("NO_USER_KEY", "No user key for this role.");
-    const privateKey = await decryptHex(uk.encryptedPrivateKey, uk.iv, masterKey);
-    return { privateKey };
+    try {
+      return { privateKey: await decryptHex(uk.encryptedPrivateKey, uk.iv, masterKey) };
+    } catch {
+      throw new CliError("BAD_MASTER_KEY", "The master key does not decrypt your RPass user key. Check the master password.", [
+        "rpl rpass unlock",
+      ]);
+    }
+  }
+
+  private async userId(): Promise<string> {
+    const accounts = await this.req<any[]>("GET", "/auth_ext/get_rpass_account_info/");
+    const id = accounts.find((a) => a.id === this.session.roleId)?.role?.user_cache?._id?.$oid;
+    if (!id) throw new CliError("NO_USER", "Rippling returned no user for this role.");
+    return id;
   }
 
   private async broadcastKey(privateKey: string): Promise<string> {
@@ -133,7 +157,7 @@ export class RipplingClient {
   async personalItems(masterKey: string): Promise<VaultItem[]> {
     const items = await this.req<any[]>(
       "GET",
-      `/rpass/api/personal_vault_items/?employee=${this.session.roleId}`,
+      `/rpass/api/personal_vault_items/?employee=${await this.userId()}`,
     );
     return Promise.all(items.map((i) => RipplingClient.decode(i, masterKey, "personal")));
   }

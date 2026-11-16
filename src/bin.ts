@@ -121,6 +121,16 @@ rpass
       const password = opts.password ?? (await promptHidden("Master password"));
       if (!password) throw new CliError("NO_PASSWORD", "A master password is required to unlock.");
       const masterKey = await client.deriveMasterKey(password);
+      try {
+        await client.userPrivateKey(masterKey);
+      } catch (e) {
+        if (e instanceof CliError && e.code === "BAD_MASTER_KEY" && !(await client.verifyPassword(password))) {
+          throw new CliError("WRONG_PASSWORD", "Rippling rejected this password. The master password is your Rippling login password.", [
+            "rpl rpass unlock",
+          ]);
+        }
+        throw e;
+      }
       saveKeys({ masterKey });
       out({ ok: true, unlocked: true });
     }),
