@@ -1,0 +1,31 @@
+{
+  "name": "rippling-cli",
+  "version": "0.1.0",
+  "description": "rpl - Rippling CLI with RPass password-manager support",
+  "type": "module",
+  "bin": {
+    "rpl": "dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/bin.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --import tsx src/*.test.ts"
+  },
+  "dependencies": {
+    "classic-level": "^1.4.1",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  }
+}
