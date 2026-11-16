@@ -4,6 +4,7 @@ import { CliError, loadKeys, loadSession, requireSession, saveKeys, saveSession 
 import { importFromExtension } from "./extension.ts";
 import { RipplingClient, type VaultItem } from "./client.ts";
 import { totp } from "./totp.ts";
+import pkg from "../package.json" with { type: "json" };
 
 const out = (v: unknown): void => console.log(JSON.stringify(v, null, 2));
 const fail = (e: unknown): never => {
@@ -20,14 +21,24 @@ const run = (fn: () => Promise<void>): void => void fn().catch(fail);
 async function promptHidden(label: string): Promise<string> {
   const env = process.env.RPL_MASTER_PASSWORD;
   if (env) return env;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const stdout = process.stdout as NodeJS.WriteStream & { _writeToOutput?: (s: string) => void };
-  (stdout as any)._writeToOutput = (s: string) => stdout.write(s.includes(label) ? s : "");
+  if (!process.stdin.isTTY) {
+    throw new CliError("NO_PASSWORD", "No TTY to prompt for the master password.", [
+      "Set RPL_MASTER_PASSWORD or pass --password",
+    ]);
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+  // readline echoes typed keys through this private hook; mute everything but the prompt.
+  (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = (s) => {
+    if (s.includes(label)) process.stderr.write(s);
+  };
   try {
-    return await new Promise<string>((resolve) => rl.question(`${label}: `, (a) => resolve(a)));
+    return await new Promise<string>((resolve, reject) => {
+      rl.on("close", () => reject(new CliError("NO_PASSWORD", "Prompt closed before a password was entered.")));
+      rl.question(`${label}: `, resolve);
+    });
   } finally {
     rl.close();
-    stdout.write("\n");
+    process.stderr.write("\n");
   }
 }
 
@@ -54,7 +65,7 @@ const allItems = async (client: RipplingClient, vault: string, mk: string): Prom
 };
 
 const program = new Command();
-program.name("rpl").description("Rippling CLI").version("0.1.0");
+program.name("rpl").description("Rippling CLI").version(pkg.version);
 
 const rpass = program.command("rpass").description("RPass password manager");
 

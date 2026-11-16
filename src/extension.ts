@@ -51,25 +51,41 @@ async function readStore(storePath: string): Promise<Record<string, unknown>> {
 
 export interface ExtensionAuth {
   session: Session;
-  encryptedMasterKeys?: unknown;
   storePath: string;
 }
 
 export async function importFromExtension(storePathArg?: string): Promise<ExtensionAuth> {
-  const candidates = storePathArg ? [storePathArg] : findStores();
-  if (candidates.length === 0) {
+  if (storePathArg) return sessionFromStore(storePathArg);
+  const stores = findStores();
+  if (stores.length === 0) {
     throw new CliError("EXT_STORE_NOT_FOUND", "No RPass extension store found in Aside/Chrome/Brave.", [
       "Open the browser signed into Rippling, or pass --store <path>",
     ]);
   }
-  if (candidates.length > 1 && !storePathArg) {
+  const signedIn: ExtensionAuth[] = [];
+  for (const s of stores) {
+    try {
+      signedIn.push(await sessionFromStore(s));
+    } catch (e) {
+      if (!(e instanceof CliError && e.code === "EXT_NOT_SIGNED_IN")) throw e;
+    }
+  }
+  if (signedIn.length === 0) {
+    throw new CliError("EXT_NOT_SIGNED_IN", "No RPass extension store has an active session (sign into RPass first).", [
+      "Open RPass in the browser and unlock it, then retry",
+    ]);
+  }
+  if (signedIn.length > 1) {
     throw new CliError(
       "EXT_STORE_AMBIGUOUS",
-      `Multiple RPass stores found; pick one with --store:\n  ${candidates.join("\n  ")}`,
-      candidates.map((c) => `rpl rpass auth import-extension --store "${c}"`),
+      `Multiple signed-in RPass stores; pick one with --store:\n  ${signedIn.map((a) => `${a.session.email ?? "?"}  ${a.storePath}`).join("\n  ")}`,
+      signedIn.map((a) => `rpl rpass auth import-extension --store "${a.storePath}"`),
     );
   }
-  const storePath = candidates[0]!;
+  return signedIn[0]!;
+}
+
+async function sessionFromStore(storePath: string): Promise<ExtensionAuth> {
   const data = await readStore(storePath);
   const str = (k: string): string | undefined =>
     typeof data[k] === "string" ? (data[k] as string) : undefined;
@@ -91,7 +107,6 @@ export async function importFromExtension(storePathArg?: string): Promise<Extens
       companyId,
       expiresAt: str("expires_at"),
     },
-    encryptedMasterKeys: data["rpass-mk"] ?? data["master_key"],
     storePath,
   };
 }
